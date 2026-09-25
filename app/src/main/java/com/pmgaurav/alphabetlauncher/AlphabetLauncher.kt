@@ -2,6 +2,11 @@ package com.pmgaurav.alphabetlauncher
 
 import android.content.ComponentName
 import android.content.Intent
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.IntentFilter
+import android.content.pm.PackageManager
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -69,17 +74,18 @@ fun AlphabetLauncher() {
         }
     }
 
-    val applications = remember {
+    fun loadApplications(): List<AppInfo> {
         val intent = Intent(Intent.ACTION_MAIN).apply {
             addCategory(Intent.CATEGORY_LAUNCHER)
         }
         val resolveInfos = packageManager
-            .queryIntentActivities(intent,0)
-        resolveInfos
+            .queryIntentActivities(intent, 0)
+
+        return resolveInfos
             .groupBy {
                 it.activityInfo.packageName
             }
-            .map {(_, activities) ->
+            .map { (_, activities) ->
                 val resolveInfo = activities.first()
                 AppInfo(
                     name = resolveInfo
@@ -96,7 +102,11 @@ fun AlphabetLauncher() {
             }
             .sortedWith(
                 compareBy<AppInfo> {
-                    if (it.name.trim().firstOrNull()?.isLetter() == true) {
+                    if (it.name
+                            .trim()
+                            .firstOrNull()
+                            ?.isLetter() == true
+                    ) {
                         0
                     } else {
                         1
@@ -105,6 +115,39 @@ fun AlphabetLauncher() {
                     it.name.lowercase()
                 }
             )
+    }
+    var applications by remember {
+        mutableStateOf(
+            loadApplications()
+        )
+    }
+    DisposableEffect(Unit) {
+
+        val receiver = object : BroadcastReceiver() {
+
+            override fun onReceive(
+                context: Context?,
+                intent: Intent?
+            ) {
+                applications = loadApplications()
+            }
+        }
+
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_PACKAGE_ADDED)
+            addAction(Intent.ACTION_PACKAGE_REMOVED)
+            addAction(Intent.ACTION_PACKAGE_CHANGED)
+            addDataScheme("package")
+        }
+
+        context.registerReceiver(
+            receiver,
+            filter
+        )
+
+        onDispose {
+            context.unregisterReceiver(receiver)
+        }
     }
     val favouriteApps = applications.take(7)
 
