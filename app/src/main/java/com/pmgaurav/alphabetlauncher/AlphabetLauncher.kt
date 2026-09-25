@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -30,7 +31,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -129,7 +129,7 @@ fun AlphabetLauncher() {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Row(
             modifier = Modifier.fillMaxSize()
@@ -150,7 +150,7 @@ fun AlphabetLauncher() {
                             "HH:mm",
                             Locale.getDefault()
                         ).format(currentTime),
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onBackground,
                         fontSize = 42.sp,
                         fontWeight = FontWeight.Light
                     )
@@ -159,7 +159,7 @@ fun AlphabetLauncher() {
                             "EEE, dd MMM",
                             Locale.getDefault()
                         ).format(currentTime),
-                        color = Color.LightGray,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                         fontSize = 16.sp
                     )
                     Spacer(
@@ -170,7 +170,7 @@ fun AlphabetLauncher() {
 
                     Text(
                         text = selectedLetter.toString(),
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onBackground,
                         fontSize = 32.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -182,7 +182,7 @@ fun AlphabetLauncher() {
                 if (displayedApps.isEmpty()){
                     Text(
                         text = " No Apps",
-                        color = Color.LightGray,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                         fontSize = 16.sp
                     )
                 } else {
@@ -232,7 +232,7 @@ fun AlphabetLauncher() {
                                 )
                                 Text(
                                     text = app.name,
-                                    color = Color.White,
+                                    color = MaterialTheme.colorScheme.onBackground,
                                     fontSize = 17.sp,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -246,12 +246,24 @@ fun AlphabetLauncher() {
                 modifier = Modifier
                     .fillMaxHeight()
                     .width(42.dp)
-                    .padding(vertical = 20.dp)
+                    .padding(
+                        top = 120.dp,
+                        bottom = 10.dp
+                    )
             ) {
 
                 CurvedAlphabet(
                     selectedLetter = selectedLetter,
                     selectedSpecial = selectedSpecial,
+                    availableLetters = applications
+                        .mapNotNull { app ->
+                            app.name
+                                .trim()
+                                .firstOrNull()
+                                ?.uppercaseChar()
+                                ?.takeIf { it in 'A'..'Z' }
+                        }
+                        .toSet(),
                     onLetterSelected = { letter ->
                         selectedLetter = letter
                         showSelectedApps = true

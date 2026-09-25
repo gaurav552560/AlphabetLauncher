@@ -1,5 +1,13 @@
 package com.pmgaurav.alphabetlauncher
 
+import android.content.Context
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
+import android.view.HapticFeedbackConstants
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -13,8 +21,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -27,6 +37,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -40,10 +52,12 @@ import kotlin.math.roundToInt
 fun CurvedAlphabet(
     selectedLetter: Char,
     selectedSpecial: Char?,
+    availableLetters: Set<Char>,
     onLetterSelected: (Char) -> Unit,
     onSpecialSelected: (Char?) -> Unit,
     onDragStateChanged: (Boolean) -> Unit
 ){
+    val view = LocalView.current
     var alphabetHeight by remember {
         mutableIntStateOf(0)
     }
@@ -53,6 +67,12 @@ fun CurvedAlphabet(
     var isAlphabetDragging by remember {
         mutableStateOf(false)
     }
+    var lastHapticSelection by remember {
+        mutableStateOf<Char?>(null)
+    }
+    val curveStrength = remember {
+        Animatable(0f)
+    }
     fun updateLetterFromY(y: Float) {
         if (alphabetHeight <= 0) {
             return
@@ -61,6 +81,26 @@ fun CurvedAlphabet(
         val index = (clampedY / alphabetHeight * 29)
             .toInt()
             .coerceIn(0, 28)
+        val selectedForHaptic =
+            when (index) {
+                0 -> '★'
+                28 -> '•'
+                else -> {
+                    val letterIndex = index - 1
+
+                    if (letterIndex == 26) {
+                        '#'
+                    } else {
+                        ('A'.code + letterIndex).toChar()
+                    }
+                }
+            }
+        if (selectedForHaptic != lastHapticSelection) {
+            view.performHapticFeedback(
+                HapticFeedbackConstants.CLOCK_TICK
+            )
+            lastHapticSelection = selectedForHaptic
+        }
         when(index){
             0 -> {onSpecialSelected('★')}
             28 -> {onSpecialSelected('•')}
@@ -76,6 +116,19 @@ fun CurvedAlphabet(
 
                 onLetterSelected(letter)
             }
+        }
+    }
+    LaunchedEffect(isAlphabetDragging) {
+        if (isAlphabetDragging) {
+            curveStrength.snapTo(1f)
+        } else {
+            curveStrength.animateTo(
+                targetValue = 0f,
+                animationSpec = spring(
+                    dampingRatio = 0.65f,
+                    stiffness = 500f
+                )
+            )
         }
     }
     Box(
@@ -106,11 +159,13 @@ fun CurvedAlphabet(
                     onDragEnd = {
                         isAlphabetDragging = false
                         touchY = -1f
+                        lastHapticSelection = null
                         onDragStateChanged(false)
                     },
                     onDragCancel = {
                         isAlphabetDragging = false
                         touchY = -1f
+                        lastHapticSelection = null
                         onDragStateChanged(false)
                     }
                 )
@@ -135,7 +190,7 @@ fun CurvedAlphabet(
                         val distance = (abs(normalizedItemY - normalizedFingerY) * 2f)
                             .coerceIn(0f, 1f)
                         val cosine = (cos(distance * PI) + 1.0)/2.0
-                        cosine.toFloat()
+                        cosine.toFloat() * curveStrength.value
                     } else {
                         0f
                     }
@@ -147,14 +202,22 @@ fun CurvedAlphabet(
                                 item[0] == selectedLetter -> true
                         else -> false
                     }
+                val isEmptyLetter =
+                    item.length == 1 &&
+                            item[0].isLetter() &&
+                            item[0] !in availableLetters
 
                 Text(
                     text = item,
-                    color = Color.White,
+                    color = if (isEmptyLetter){
+                        MaterialTheme.colorScheme.onBackground.copy(alpha = 0.35f)
+                    } else {
+                        MaterialTheme.colorScheme.onBackground
+                    },
                     fontSize = if (isSelected) {
                         18.sp
                     } else {
-                        14.sp
+                        16.sp
                     },
                     fontWeight = if (isSelected) {
                         FontWeight.Bold
@@ -178,7 +241,7 @@ fun CurvedAlphabet(
                             }
                         }
                         .padding(
-                            vertical = 1.dp,
+                            vertical = 0.1.dp,
                             horizontal = 4.dp
                         )
                 )
@@ -197,12 +260,14 @@ fun CurvedAlphabet(
                     }
                     .size(48.dp)
                     .clip(CircleShape)
-                    .background(Color.DarkGray.copy(alpha = 0.45f)),
+                    .background(
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = selectedSpecial?.toString() ?: selectedLetter.toString(),
-                    color = Color.LightGray,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 28.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -220,7 +285,7 @@ fun CurvedAlphabet(
                     }
                     .size(12.dp)
                     .clip(CircleShape)
-                    .background(Color.LightGray)
+                    .background(MaterialTheme.colorScheme.onSurface)
             )
         }
     }
