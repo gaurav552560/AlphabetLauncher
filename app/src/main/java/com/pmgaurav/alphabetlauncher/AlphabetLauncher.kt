@@ -185,15 +185,18 @@ fun AlphabetLauncher() {
     }
     val favouriteApps = applications.take(7)
 
+//    val appsByLetter = applications.groupBy { app ->
+//        val firstCharecter = app.name
+//            .trim()
+//            .firstOrNull()
+//        if (firstCharecter?.isLetter() == true){
+//            firstCharecter.uppercaseChar()
+//        } else {
+//            '#'
+//        }
+//    }
     val appsByLetter = applications.groupBy { app ->
-        val firstCharecter = app.name
-            .trim()
-            .firstOrNull()
-        if (firstCharecter?.isLetter() == true){
-            firstCharecter.uppercaseChar()
-        } else {
-            '#'
-        }
+        letterFromName(app.name)
     }
     val selectedApps = appsByLetter[selectedLetter].orEmpty()
     val searchResults = if (searchQuery.isBlank()) {

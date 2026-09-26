@@ -82,19 +82,24 @@ fun CurvedAlphabet(
             .toInt()
             .coerceIn(0, 28)
         val selectedForHaptic =
-            when (index) {
-                0 -> '★'
-                28 -> '•'
-                else -> {
-                    val letterIndex = index - 1
-
-                    if (letterIndex == 26) {
-                        '#'
-                    } else {
-                        ('A'.code + letterIndex).toChar()
-                    }
-                }
-            }
+            letterFromTouchY(
+                y,
+                alphabetHeight
+            )
+//        val selectedForHaptic =
+//            when (index) {
+//                0 -> '★'
+//                28 -> '•'
+//                else -> {
+//                    val letterIndex = index - 1
+//
+//                    if (letterIndex == 26) {
+//                        '#'
+//                    } else {
+//                        ('A'.code + letterIndex).toChar()
+//                    }
+//                }
+//            }
         if (selectedForHaptic != lastHapticSelection) {
             view.performHapticFeedback(
                 HapticFeedbackConstants.CLOCK_TICK
