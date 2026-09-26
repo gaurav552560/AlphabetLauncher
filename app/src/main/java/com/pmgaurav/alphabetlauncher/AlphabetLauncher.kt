@@ -5,7 +5,7 @@ import android.content.Intent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.IntentFilter
-import android.content.pm.PackageManager
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -33,10 +33,20 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -67,10 +77,34 @@ fun AlphabetLauncher() {
     var selectedSpecial by remember {
         mutableStateOf<Char?>(null)
     }
+    var isSearchOpen by remember {
+        mutableStateOf(false)
+    }
+
+    var searchQuery by remember {
+        mutableStateOf("")
+    }
+
+    val focusRequester = remember {
+        FocusRequester()
+    }
+
+    val keyboardController = LocalSoftwareKeyboardController.current
+    BackHandler(enabled = isSearchOpen) {
+        isSearchOpen = false
+        searchQuery = ""
+        keyboardController?.hide()
+    }
     LaunchedEffect(Unit) {
         while (true){
             currentTime = Date()
             delay(1000)
+        }
+    }
+    LaunchedEffect(isSearchOpen) {
+        if (isSearchOpen) {
+            focusRequester.requestFocus()
+            keyboardController?.show()
         }
     }
 
@@ -162,8 +196,18 @@ fun AlphabetLauncher() {
         }
     }
     val selectedApps = appsByLetter[selectedLetter].orEmpty()
+    val searchResults = if (searchQuery.isBlank()) {
+        applications
+    } else {
+        applications.filter {
+            it.name.contains(
+                searchQuery,
+                ignoreCase = true
+            )
+        }
+    }
     val displayedApps =
-        if (showSelectedApps) {
+        if (showSelectedApps){
             selectedApps
         } else {
             favouriteApps
@@ -174,73 +218,96 @@ fun AlphabetLauncher() {
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        Row(
-            modifier = Modifier.fillMaxSize()
-        ) {
+
+        if (isSearchOpen) {
+
             Column(
                 modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
+                    .fillMaxSize()
                     .padding(
-                        start = 32.dp,
-                        top = 80.dp,
-                        end = 20.dp,
+                        horizontal = 20.dp,
+                        vertical = 32.dp
                     )
             ) {
-                if (!isDragging){
-                    Text(
-                        text = SimpleDateFormat(
-                            "HH:mm",
-                            Locale.getDefault()
-                        ).format(currentTime),
-                        color = MaterialTheme.colorScheme.onBackground,
-                        fontSize = 42.sp,
-                        fontWeight = FontWeight.Light
-                    )
-                    Text(
-                        text = SimpleDateFormat(
-                            "EEE, dd MMM",
-                            Locale.getDefault()
-                        ).format(currentTime),
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-                        fontSize = 16.sp
-                    )
-                    Spacer(
-                        modifier = Modifier.height(24.dp)
-                    )
-                }
-                if (isDragging) {
 
-                    Text(
-                        text = selectedLetter.toString(),
-                        color = MaterialTheme.colorScheme.onBackground,
-                        fontSize = 32.sp,
-                        fontWeight = FontWeight.Bold
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = {
+                        searchQuery = it
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequester),
+                    placeholder = {
+                        Text(
+                            text = "Search apps",
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)
+                        )
+                    },
+                    leadingIcon = {
+                        Text(
+                            text = "⌕",
+                            fontSize = 25.sp,
+                            color = MaterialTheme.colorScheme.onBackground.copy(
+                                alpha = 0.7f
+                            )
+                        )
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            Text(
+                                text = "×",
+                                fontSize = 24.sp,
+                                color = MaterialTheme.colorScheme.onBackground.copy(
+                                    alpha = 0.7f
+                                ),
+                                modifier = Modifier.clickable {
+                                    searchQuery = ""
+                                }
+                            )
+                        }
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(26.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor =
+                            MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor =
+                            MaterialTheme.colorScheme.surface,
+                        focusedBorderColor =
+                            MaterialTheme.colorScheme.onBackground
+                                .copy(alpha = 0.35f),
+                        unfocusedBorderColor =
+                            MaterialTheme.colorScheme.onBackground
+                                .copy(alpha = 0.20f)
+                    ),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Text,
+                        imeAction = ImeAction.Search
                     )
+                )
+
+                if (searchQuery.isNotBlank()) {
 
                     Spacer(
-                        modifier = Modifier.height(12.dp)
+                        modifier = Modifier.height(16.dp)
                     )
-                }
-                if (displayedApps.isEmpty()){
-                    Text(
-                        text = " No Apps",
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-                        fontSize = 16.sp
-                    )
-                } else {
+
                     LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
                         contentPadding = PaddingValues(
                             vertical = 8.dp
                         )
                     ) {
+
                         items(
-                            items = displayedApps,
-                            key = {app ->
+                            items = searchResults,
+                            key = { app ->
                                 app.packageName
                             }
-                        ){ app ->
+                        ) { app ->
 
                             Row(
                                 modifier = Modifier
@@ -285,45 +352,175 @@ fun AlphabetLauncher() {
                     }
                 }
             }
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(42.dp)
-                    .padding(
-                        top = 120.dp,
-                        bottom = 10.dp
-                    )
+
+        } else {
+
+            Row(
+                modifier = Modifier.fillMaxSize()
             ) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .padding(
+                            start = 32.dp,
+                            top = 80.dp,
+                            end = 20.dp,
+                        )
+                        .pointerInput(isSearchOpen) {
+                            detectVerticalDragGestures(
+                                onVerticalDrag = { change, dragAmount ->
 
-                CurvedAlphabet(
-                    selectedLetter = selectedLetter,
-                    selectedSpecial = selectedSpecial,
-                    availableLetters = applications
-                        .mapNotNull { app ->
-                            app.name
-                                .trim()
-                                .firstOrNull()
-                                ?.uppercaseChar()
-                                ?.takeIf { it in 'A'..'Z' }
+                                    if (
+                                        dragAmount < -20f &&
+                                        !isSearchOpen &&
+                                        !isDragging
+                                    ) {
+                                        isSearchOpen = true
+                                        change.consume()
+                                    }
+                                }
+                            )
                         }
-                        .toSet(),
-                    onLetterSelected = { letter ->
-                        selectedLetter = letter
-                        showSelectedApps = true
-                    },
-                    onSpecialSelected = { special ->
-                        selectedSpecial = special
-                    },
-                    onDragStateChanged = { dragging ->
-                        isDragging = dragging
-                        showSelectedApps = dragging
+                ) {
+                    if (!isDragging) {
+                        Text(
+                            text = SimpleDateFormat(
+                                "HH:mm",
+                                Locale.getDefault()
+                            ).format(currentTime),
+                            color = MaterialTheme.colorScheme.onBackground,
+                            fontSize = 42.sp,
+                            fontWeight = FontWeight.Light
+                        )
+                        Text(
+                            text = SimpleDateFormat(
+                                "EEE, dd MMM",
+                                Locale.getDefault()
+                            ).format(currentTime),
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                            fontSize = 16.sp
+                        )
+                        Spacer(
+                            modifier = Modifier.height(24.dp)
+                        )
+                    }
+                    if (isDragging) {
 
-                        if (!dragging) {
-                            selectedLetter = ' '
-                            selectedSpecial = null
+                        Text(
+                            text = selectedLetter.toString(),
+                            color = MaterialTheme.colorScheme.onBackground,
+                            fontSize = 32.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Spacer(
+                            modifier = Modifier.height(12.dp)
+                        )
+                    }
+                    if (displayedApps.isEmpty()) {
+                        Text(
+                            text = " No Apps",
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                            fontSize = 16.sp
+                        )
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(
+                                vertical = 8.dp
+                            )
+                        ) {
+                            items(
+                                items = displayedApps,
+                                key = { app ->
+                                    app.packageName
+                                }
+                            ) { app ->
+
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .clickable {
+                                            val launchIntent = Intent(Intent.ACTION_MAIN).apply {
+                                                component = ComponentName(
+                                                    app.packageName,
+                                                    app.className
+                                                )
+                                                addCategory(Intent.CATEGORY_LAUNCHER)
+                                            }
+                                            context.startActivity(launchIntent)
+                                        }
+                                        .padding(
+                                            horizontal = 12.dp,
+                                            vertical = 10.dp
+                                        ),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    val bitmap = app.icon
+                                        .toBitmap()
+                                        .asImageBitmap()
+                                    Image(
+                                        bitmap = bitmap,
+                                        contentDescription = app.name,
+                                        modifier = Modifier.size(48.dp)
+                                    )
+                                    Spacer(
+                                        modifier = Modifier.width(14.dp)
+                                    )
+                                    Text(
+                                        text = app.name,
+                                        color = MaterialTheme.colorScheme.onBackground,
+                                        fontSize = 17.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
                         }
                     }
-                )
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .width(42.dp)
+                        .padding(
+                            top = 120.dp,
+                            bottom = 10.dp
+                        )
+                ) {
+
+                    CurvedAlphabet(
+                        selectedLetter = selectedLetter,
+                        selectedSpecial = selectedSpecial,
+                        availableLetters = applications
+                            .mapNotNull { app ->
+                                app.name
+                                    .trim()
+                                    .firstOrNull()
+                                    ?.uppercaseChar()
+                                    ?.takeIf { it in 'A'..'Z' }
+                            }
+                            .toSet(),
+                        onLetterSelected = { letter ->
+                            selectedLetter = letter
+                            showSelectedApps = true
+                        },
+                        onSpecialSelected = { special ->
+                            selectedSpecial = special
+                        },
+                        onDragStateChanged = { dragging ->
+                            isDragging = dragging
+                            showSelectedApps = dragging
+
+                            if (!dragging) {
+                                selectedLetter = ' '
+                                selectedSpecial = null
+                            }
+                        }
+                    )
+                }
             }
         }
     }
