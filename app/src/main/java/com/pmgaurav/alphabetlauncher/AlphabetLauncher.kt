@@ -6,10 +6,12 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.IntentFilter
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -37,6 +39,8 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.input.ImeAction
@@ -54,14 +58,23 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AlphabetLauncher() {
     val context = LocalContext.current
     val packageManager = context.packageManager
+    val favouriteStore = remember {
+        FavouriteStore(context)
+    }
+    val favouritePackages by favouriteStore
+        .favouritePackages
+        .collectAsState(initial = emptySet())
+
+    val coroutineScope = rememberCoroutineScope()
     var currentTime by remember {
         mutableStateOf(Date())
     }
@@ -183,7 +196,16 @@ fun AlphabetLauncher() {
             context.unregisterReceiver(receiver)
         }
     }
-    val favouriteApps = applications.take(7)
+    val favouriteApps =
+        if( favouritePackages.isEmpty()){
+            applications.take(7)
+        } else {
+            applications
+                .filter { app ->
+                    app.packageName in favouritePackages
+                }
+                .take(7)
+        }
 
 //    val appsByLetter = applications.groupBy { app ->
 //        val firstCharecter = app.name
@@ -445,16 +467,33 @@ fun AlphabetLauncher() {
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(12.dp))
-                                        .clickable {
-                                            val launchIntent = Intent(Intent.ACTION_MAIN).apply {
-                                                component = ComponentName(
-                                                    app.packageName,
-                                                    app.className
-                                                )
-                                                addCategory(Intent.CATEGORY_LAUNCHER)
+                                        .combinedClickable(
+                                            onClick = {
+                                                val launchIntent = Intent(Intent.ACTION_MAIN).apply {
+                                                    component = ComponentName(
+                                                        app.packageName,
+                                                        app.className
+                                                    )
+                                                    addCategory(Intent.CATEGORY_LAUNCHER)
+                                                }
+
+                                                context.startActivity(launchIntent)
+                                            },
+                                            onLongClick = {
+                                                coroutineScope.launch {
+
+                                                    if (app.packageName in favouritePackages) {
+                                                        favouriteStore.removeFavourite(
+                                                            app.packageName
+                                                        )
+                                                    } else if (favouritePackages.size < 7) {
+                                                        favouriteStore.addFavourite(
+                                                            app.packageName
+                                                        )
+                                                    }
+                                                }
                                             }
-                                            context.startActivity(launchIntent)
-                                        }
+                                        )
                                         .padding(
                                             horizontal = 12.dp,
                                             vertical = 10.dp
